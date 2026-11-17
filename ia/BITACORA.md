@@ -20,3 +20,10 @@
 - **Evidencia:** Ejecución en modo Build. Se instalaron dependencias de testing (`jest-expo`, `react-test-renderer`) y se ajustó la suite usando snapshots.
 - **Validación:** TDD aplicado. 3/3 suites de pruebas pasaron a verde.
 - **Decisión:** Interfaz base aprobada. Listo para implementar lógica de Firebase/SQLite.
+
+### Registro: Integración de API en Login y SecureStore
+- **Tarea:** Conectar `app/login.tsx` al backend (`POST /api/auth/login`).
+- **Propósito:** Manejar el estado del formulario (email, password), invocar a la API y persistir el token de acceso de manera segura.
+- **Evidencia:** Se implementó `useState` para el formulario y `expo-secure-store` para guardar el token tras recibir un código 200.
+- **Validación:** El tipado en `app/login.tsx` es correcto. Las pruebas de interacción de Testing Library presentan conflicto con React 19, por lo que se priorizará la validación end-to-end en el emulador.
+- **Decisión:** Lógica de login aprobada.
