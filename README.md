@@ -75,3 +75,6 @@ Cuando EAS termine, descarga el APK desde el panel de la build. No ejecutes `eas
 ## Evidencias y bitácora
 
 La documentación de decisiones, contención y validación está en `ia/BITACORA.md`, `ia/PRUEBAS-CONTENCION.md`, `ia/CONFIGURACION.md` e `ia/EVIDENCIAS-CIERRE.md`.
+
+## APK de Android (EAS Build)
+- **Enlace de compilación y descarga:** https://expo.dev/accounts/sepum/projects/12-control-de-habitos-app/builds/3d5ca5d8-e782-4c8d-9203-43716abb9d31
