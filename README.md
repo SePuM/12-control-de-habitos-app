@@ -1,56 +1,77 @@
-# Welcome to your Expo app 👋
+# Control de Hábitos — Proyecto 12
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+App móvil hecha con Expo, React Native y TypeScript. Usa Expo Router para navegación, SQLite para operación offline-first y una API pública desplegada en Vercel.
 
-## Get started
+## Requisitos
 
-1. Install dependencies
+- Node.js 20 LTS y npm.
+- Expo Go, emulador Android o dispositivo físico para probar la app.
+- Cuenta de Expo/EAS solo si se desea generar un APK.
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Instalación
 
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+## Configuración de la API
 
-### Other setup steps
+Crea un archivo `.env` local en la raíz del proyecto con la URL pública de la API:
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+```env
+EXPO_PUBLIC_API_URL=https://12-control-de-habitos-api.vercel.app
+```
 
-## Learn more
+- `EXPO_PUBLIC_API_URL` es una variable pública: no contiene secretos.
+- `.env*` está ignorado por Git; nunca lo subas al repositorio.
+- Para desarrollo local puedes apuntar a otra URL, pero las builds de producción deben usar la URL HTTPS de Vercel. Así se evita localhost o IP privada en producción.
 
-To learn more about developing your project with Expo, look at the following resources:
+## Ejecución
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```bash
+npx expo start
+```
 
-## Join the community
+Desde el menú de Expo puedes abrir la app en Expo Go, emulador Android o simulador iOS.
 
-Join our community of developers creating universal apps.
+## Pruebas y calidad
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+La compuerta única es:
+
+```bash
+npm run check
+```
+
+Este comando ejecuta, en orden:
+
+- `npm run typecheck` — TypeScript sin errores.
+- `npm run lint` — ESLint de Expo.
+- `npm run format:check` — Prettier.
+- `npm test` — Jest con `react-test-renderer`.
+
+Estado vigente: `14/14` suites, `157/157` tests y `1/1` snapshot en verde.
+
+## Arquitectura
+
+- `app/`: pantallas y rutas con Expo Router (`login`, `dashboard`, `semana`, `habito/nuevo`, `habito/editar`, `habito/[id]`).
+- `src/api/`: base URL centralizada y sesión con refresh automático ante 401.
+- `src/db/` y `src/services/offline-sync.ts`: SQLite offline-first con tablas para hábitos, registros, cambios pendientes y última sincronización.
+- `src/sensors/`: podómetro y acelerómetro con alternativas manuales y accesibles.
+- `src/components/`: gestos accesibles con doble toque, pulsación larga y botón alternativo.
+
+Los tokens de acceso se guardan en `expo-secure-store` bajo `token` y `refreshToken`; no se imprimen en consola ni se versionan.
+
+## Generar APK con EAS Build
+
+El perfil `apk` de `eas.json` genera un archivo `.apk` para Android:
+
+```bash
+npx eas-cli@latest login
+npx eas-cli@latest build -p android --profile apk
+```
+
+Cuando EAS termine, descarga el APK desde el panel de la build. No ejecutes `eas build`, `git push` ni despliegues sin permiso explícito.
+
+## Evidencias y bitácora
+
+La documentación de decisiones, contención y validación está en `ia/BITACORA.md`, `ia/PRUEBAS-CONTENCION.md`, `ia/CONFIGURACION.md` e `ia/EVIDENCIAS-CIERRE.md`.

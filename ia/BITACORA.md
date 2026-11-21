@@ -1,41 +1,67 @@
 # Bitácora de Uso de IA
 
-_Nota: Se llenará una vez por tarea usando el ciclo: Modo plan -> Edición -> Revisión del diff completo._
+_Ciclo aplicado: modo plan → edición → revisión del diff completo → validación._
 
 ## Registro de Tareas
 
 - **Tarea:** (Ej. Crear pantalla de nuevo hábito)
 - **Propósito:** (Lo que se busca lograr)
 - **Evidencia / Prompt:** (El texto enviado)
-- **Validación / Pruebas:** (Comprobación en Jest)
+- **Validación / Pruebas:** (Comprobación con Jest)
 - **Decisión:** (Aprobado / Rechazado)
 
-## Casos de Rechazo o Corrección (Mínimo 3 obligatorios)
+## Casos de Rechazo o Corrección
 
-1. **Caso 1:** (Pendiente de documentar durante el desarrollo)
-2. **Caso 2:** (Pendiente de documentar durante el desarrollo)
-3. **Caso 3:** (Pendiente de documentar durante el desarrollo)
+1. **Rechazo de secreto:** se rechazó leer `.env.local` o cualquier keystore; la evidencia quedó en `PRUEBAS-CONTENCION.md`.
+2. **Corrección de alcance:** se rechazó salir de la raíz del proyecto; todas las lecturas/escrituras se hicieron dentro de `12-control-de-habitos-app`.
+3. **Corrección de testing:** `@testing-library/react-native` conflictuó con React 19; se migró a `react-test-renderer` y `useFocusEffect` con callback capturado.
+4. **Corrección de persistencia:** el cronómetro manual no sobrevivía al remontar; se añadió `tipo: "tiempo"`, guardado en `cambios_pendientes` y recálculo desde SQLite.
+5. **Corrección de título:** el detalle podía mostrar el id crudo; se priorizó `nombre` de la API, luego SQLite local y nunca el identificador.
 
 ### Registro: Arquitectura Base y Fase Verde UI
 
-- **Tarea:** Configurar `expo-router` en el directorio raíz `app/` y crear UI base.
-- **Propósito:** Eliminar componentes plantilla (`src/app`), establecer enrutador sin header (`_layout.tsx`), y crear las pantallas visuales `index.tsx` (Splash) y `login.tsx` (Formulario de sesión).
-- **Evidencia:** Ejecución en modo Build. Se instalaron dependencias de testing (`jest-expo`, `react-test-renderer`) y se ajustó la suite usando snapshots.
-- **Validación:** TDD aplicado. 3/3 suites de pruebas pasaron a verde.
-- **Decisión:** Interfaz base aprobada. Listo para implementar lógica de Firebase/SQLite.
+- **Tarea:** Configurar `expo-router` en `app/` y crear UI base.
+- **Propósito:** Eliminar plantilla, establecer layout sin header y crear splash/login.
+- **Evidencia:** Instalación de dependencias de testing y ajuste de suite con snapshots.
+- **Validación:** TDD aplicado; 3/3 suites en verde.
+- **Decisión:** Interfaz base aprobada.
 
 ### Registro: Integración de API en Login y SecureStore
 
-- **Tarea:** Conectar `app/login.tsx` al backend (`POST /api/auth/login`).
-- **Propósito:** Manejar el estado del formulario (email, password), invocar a la API y persistir el token de acceso de manera segura.
-- **Evidencia:** Se implementó `useState` para el formulario y `expo-secure-store` para guardar el token tras recibir un código 200.
-- **Validación:** El tipado en `app/login.tsx` es correcto. Las pruebas de interacción de Testing Library presentan conflicto con React 19, por lo que se priorizará la validación end-to-end en el emulador.
-- **Decisión:** Lógica de login aprobada.
+- **Tarea:** Conectar `app/login.tsx` con `POST /api/auth/login`.
+- **Propósito:** Validar credenciales y persistir token de forma segura.
+- **Evidencia:** `expo-secure-store` y manejo de errores sin logs de credenciales.
+- **Validación:** Tipado correcto; interacción probada con render sincrónico.
+- **Decisión:** Lógica aprobada.
 
 ### Registro: URL centralizada, registro/refresh y base offline
 
-- **Tarea:** Centralizar `EXPO_PUBLIC_API_URL`, añadir registro y renovación de sesión, y crear base `src/` para offline, validación y sensores.
-- **Propósito:** Permitir apuntar la app a la API desplegada sin tocar código, soportar `POST /api/auth/registro`, renovar una vez ante 401 y dejar estructura para sincronización y gestos accesibles.
-- **Evidencia:** Modo Build con TDD: pruebas nuevas en `__tests__/` para config, sesión, offline, validación, sensores y registro; `.gitignore` con `.env*`; bitácora y `AGENTS.md` actualizados.
-- **Validación:** Jest enfocado en fase roja y verde; tipado, ESLint, Prettier y `npm run check` ejecutados al final.
-- **Decisión:** Aprobado para entorno local; pendiente configurar `.env` del usuario y probar en dispositivo/EAS.
+- **Tarea:** Centralizar `EXPO_PUBLIC_API_URL`, añadir registro/refresh y base offline.
+- **Propósito:** Apuntar a la API desplegada, renovar sesión ante 401 y soportar sincronización.
+- **Evidencia:** Pruebas de config, sesión, offline, validación y sensores; `.gitignore` con `.env*`.
+- **Validación:** `npm run check` en verde.
+- **Decisión:** Aprobado para configuración local del usuario.
+
+### Registro: Ajustes visuales y claridad de interfaz
+
+- **Tarea:** Espaciado del dashboard, placeholder único de pasos, pista de gestos en semana y subtítulos de sensores.
+- **Propósito:** Mantener estética luxury dark y accesibilidad sin duplicar textos.
+- **Evidencia:** Pruebas TDD sobre `dashboard-content`, `semana-leyenda` y textos de ayuda.
+- **Validación:** `npm run check` verde con 152/152 tests.
+- **Decisión:** Aprobado.
+
+### Registro: Navegación, podómetro y persistencia del detalle
+
+- **Tarea:** Hacer funcionales «Ver historial», «Historial», el podómetro del dashboard y la carga/guardado del detalle.
+- **Propósito:** Usar ids reales, estado real del podómetro y registros persistentes SQLite + cola API.
+- **Evidencia:** Pruebas rojas nuevas en `__tests__/dashboard.test.tsx` y `__tests__/rutas-gestos.test.tsx`; implementación en `app/dashboard.tsx`, `app/habito/[id].tsx` y `src/services/offline-sync.ts`.
+- **Validación:** `npm run check` verde con 14/14 suites, 157/157 tests y 1 snapshot.
+- **Decisión:** Aprobado; se conservaron todos los `testID` y `accessibilityLabel`.
+
+### Registro: Consolidación documental y cierre
+
+- **Tarea:** Actualizar README y documentación en `ia/`, incluir EAS Build APK y evidencias de seguridad.
+- **Propósito:** Dejar instrucciones reproducibles de instalación, API pública de Vercel, pruebas y contención.
+- **Evidencia:** `README.md`, `eas.json`, `ia/EVIDENCIAS-CIERRE.md`, `ia/PRUEBAS-CONTENCION.md` e `ia/CONFIGURACION.md`.
+- **Validación:** `git status --short` sin secretos y `npm run check` en verde.
+- **Decisión:** Aprobado; sin commit.
