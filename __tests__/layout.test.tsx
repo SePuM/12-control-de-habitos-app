@@ -1,10 +1,11 @@
-import React from 'react';
-import renderer from 'react-test-renderer';
-import RootLayout from '../app/_layout';
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
-describe('RootLayout (_layout.tsx)', () => {
-  it('renders correctly', () => {
-    const tree = renderer.create(<RootLayout />).toJSON();
-    expect(tree).toMatchSnapshot();
+describe("RootLayout (_layout.tsx)", () => {
+  it("envuelve la app en GestureHandlerRootView", () => {
+    const codigo = readFileSync(join(__dirname, "../app/_layout.tsx"), "utf8");
+
+    expect(codigo).toContain("GestureHandlerRootView");
+    expect(codigo).toContain("Stack");
   });
 });

@@ -1,3 +1,134 @@
 // Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
-exports[`LoadingScreen (index.tsx) renders correctly 1`] = `null`;
+exports[`LoadingScreen (index.tsx) renders correctly 1`] = `
+<View
+  style={
+    {
+      "alignItems": "center",
+      "backgroundColor": "#0B0D10",
+      "flex": 1,
+      "justifyContent": "center",
+    }
+  }
+>
+  <Text>
+    Cargando sesión...
+  </Text>
+  <Text
+    style={
+      {
+        "color": "#8E98A8",
+        "marginTop": 12,
+      }
+    }
+  >
+    Podómetro: sin-iniciar
+  </Text>
+  <View
+    accessibilityLabel="Ir a mis hábitos"
+    accessibilityRole="button"
+    accessibilityState={
+      {
+        "busy": undefined,
+        "checked": undefined,
+        "disabled": undefined,
+        "expanded": undefined,
+        "selected": undefined,
+      }
+    }
+    accessibilityValue={
+      {
+        "max": undefined,
+        "min": undefined,
+        "now": undefined,
+        "text": undefined,
+      }
+    }
+    accessible={true}
+    collapsable={false}
+    focusable={true}
+    onClick={[Function]}
+    onResponderGrant={[Function]}
+    onResponderMove={[Function]}
+    onResponderRelease={[Function]}
+    onResponderTerminate={[Function]}
+    onResponderTerminationRequest={[Function]}
+    onStartShouldSetResponder={[Function]}
+    style={
+      {
+        "backgroundColor": "#232A36",
+        "borderRadius": 12,
+        "marginTop": 20,
+        "opacity": 1,
+        "paddingHorizontal": 20,
+        "paddingVertical": 14,
+      }
+    }
+    testID="ir-habitos-button"
+  >
+    <Text
+      style={
+        {
+          "color": "#D4AF37",
+          "fontWeight": "600",
+        }
+      }
+    >
+      Ir a mis hábitos
+    </Text>
+  </View>
+  <View
+    accessibilityLabel="Iniciar podómetro"
+    accessibilityRole="button"
+    accessibilityState={
+      {
+        "busy": undefined,
+        "checked": undefined,
+        "disabled": undefined,
+        "expanded": undefined,
+        "selected": undefined,
+      }
+    }
+    accessibilityValue={
+      {
+        "max": undefined,
+        "min": undefined,
+        "now": undefined,
+        "text": undefined,
+      }
+    }
+    accessible={true}
+    collapsable={false}
+    focusable={true}
+    onClick={[Function]}
+    onResponderGrant={[Function]}
+    onResponderMove={[Function]}
+    onResponderRelease={[Function]}
+    onResponderTerminate={[Function]}
+    onResponderTerminationRequest={[Function]}
+    onStartShouldSetResponder={[Function]}
+    style={
+      {
+        "backgroundColor": "#232A36",
+        "borderRadius": 12,
+        "marginTop": 20,
+        "opacity": 1,
+        "paddingHorizontal": 20,
+        "paddingVertical": 14,
+      }
+    }
+    testID="iniciar-pedometro-index"
+  >
+    <Text
+      style={
+        {
+          "color": "#D4AF37",
+          "fontWeight": "600",
+        }
+      }
+    >
+      Iniciar podómetro
+    </Text>
+  </View>
+</View>
+`;
