@@ -394,7 +394,10 @@ type TarjetaProps = {
   onToggle: (habito: Habito, marcado: boolean) => void;
   onEditar: (habito: Habito) => void;
   onEliminar: (habito: Habito) => void;
+  onVerHistorial: (habito: Habito) => void;
 };
+
+type AccionesProps = Omit<TarjetaProps, "onVerHistorial">;
 
 function AccionesHabito({
   habito,
@@ -403,7 +406,7 @@ function AccionesHabito({
   onToggle,
   onEditar,
   onEliminar,
-}: TarjetaProps) {
+}: AccionesProps) {
   const id = idDe(habito);
 
   return (
@@ -472,6 +475,15 @@ function HabitoCard(props: TarjetaProps) {
       <View style={styles.cardInfo}>
         <Text style={styles.cardNombre}>{capitalizar(habito.nombre)}</Text>
         <Text style={styles.cardMeta}>Diario · Meta {habito.meta ?? 1}</Text>
+        <TouchableOpacity
+          accessibilityLabel={`Ver historial de ${habito.nombre}`}
+          testID={`ver-historial-${idDe(habito)}`}
+          style={styles.verHistorialBoton}
+          onPress={() => props.onVerHistorial(habito)}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.verHistorialTexto}>Ver historial</Text>
+        </TouchableOpacity>
       </View>
       <AccionesHabito {...props} />
     </View>
@@ -566,6 +578,30 @@ export default function DashboardScreen() {
   } = useHabitos();
   const router = useRouter();
   const [confirmando, setConfirmando] = useState<Habito | null>(null);
+  const [mensajePodometro, setMensajePodometro] = useState<string | null>(null);
+
+  const abrirHistorial = (habito: Habito) => {
+    const id = idDe(habito);
+    if (!id) return;
+    const consulta = `?nombre=${encodeURIComponent(habito.nombre)}&meta=${habito.meta ?? 1}`;
+    router.push(
+      `/habito/${id}${consulta}` as Parameters<typeof router.push>[0],
+    );
+  };
+
+  const alternarPodometro = async () => {
+    if (pedometro.estado === "no-disponible") {
+      setMensajePodometro("Podómetro no disponible en este dispositivo");
+      return;
+    }
+    if (pedometro.estado === "activo" || pedometro.estado === "iniciando") {
+      pedometro.detener();
+      setMensajePodometro("Podómetro detenido");
+      return;
+    }
+    await pedometro.iniciar();
+    setMensajePodometro("Podómetro activo");
+  };
 
   const abrirEdicion = (habito: Habito) => {
     router.push({
@@ -593,6 +629,10 @@ export default function DashboardScreen() {
       router.replace("/login");
     }
   };
+
+  const primerActivo = habitos.find(
+    (habito) => habito.activo !== false && idDe(habito).length > 0,
+  );
 
   if (loading) {
     return (
@@ -637,18 +677,12 @@ export default function DashboardScreen() {
             >
               <Text style={styles.navTexto}>Semana</Text>
             </TouchableOpacity>
-            {habitos.length > 0 && (
+            {primerActivo && (
               <TouchableOpacity
                 accessibilityLabel="Ver historial del primer hábito"
                 testID="ver-detalle-button"
                 style={styles.navBoton}
-                onPress={() =>
-                  router.push(
-                    `/habito/${idDe(habitos[0])}` as Parameters<
-                      typeof router.push
-                    >[0],
-                  )
-                }
+                onPress={() => abrirHistorial(primerActivo)}
               >
                 <Text style={styles.navTexto}>Historial</Text>
               </TouchableOpacity>
@@ -659,7 +693,7 @@ export default function DashboardScreen() {
           >{`Pasos de hoy: ${pedometro.pasos}`}</Text>
           <TouchableOpacity
             {...gestosConBoton(
-              () => void pedometro.iniciar(),
+              () => void alternarPodometro(),
               "Iniciar podómetro",
             )}
             testID="iniciar-pedometro-dashboard"
@@ -667,6 +701,17 @@ export default function DashboardScreen() {
           >
             <Text style={styles.navTexto}>Podómetro</Text>
           </TouchableOpacity>
+          {pedometro.estado === "activo" &&
+            mensajePodometro !== "Podómetro activo" && (
+              <Text style={styles.estadoPodometro} testID="estado-podometro">
+                Podómetro activo
+              </Text>
+            )}
+          {mensajePodometro && (
+            <Text style={styles.estadoPodometro} testID="mensaje-podometro">
+              {mensajePodometro}
+            </Text>
+          )}
         </View>
         {errorAccion && <Text style={styles.error}>{errorAccion}</Text>}
         <FlatList
@@ -682,6 +727,7 @@ export default function DashboardScreen() {
                 onToggle={alternar}
                 onEditar={abrirEdicion}
                 onEliminar={setConfirmando}
+                onVerHistorial={abrirHistorial}
               />
             );
           }}
@@ -764,6 +810,7 @@ const styles = StyleSheet.create({
   },
   navTexto: { color: "#D4AF37", fontSize: 13, fontWeight: "600" },
   pasosTexto: { color: "#8E98A8", fontSize: 13, marginTop: 12 },
+  estadoPodometro: { color: "#D4AF37", fontSize: 12, marginTop: 6 },
   listContent: { paddingBottom: 8, flexGrow: 1 },
   card: {
     flexDirection: "row",
@@ -779,6 +826,8 @@ const styles = StyleSheet.create({
   cardInfo: { flex: 1, paddingRight: 12 },
   cardNombre: { color: "#F5F7FA", fontSize: 17, fontWeight: "600" },
   cardMeta: { color: "#8E98A8", fontSize: 13, marginTop: 4 },
+  verHistorialBoton: { alignSelf: "flex-start", marginTop: 8 },
+  verHistorialTexto: { color: "#D4AF37", fontSize: 12, fontWeight: "600" },
   cardAcciones: { alignItems: "flex-end" },
   badge: {
     backgroundColor: "rgba(212, 175, 55, 0.14)",

@@ -594,6 +594,105 @@ describe("DashboardScreen - registros de hoy", () => {
     expect(arbol.root.findAllByType(View).length).toBeGreaterThan(0);
   });
 
+  it("abre el historial del hábito con su id real", async () => {
+    configurarFetch([]);
+    const arbol = await renderizar();
+
+    pulsar(arbol, "ver-historial-h2");
+
+    expect(pushMock).toHaveBeenCalledWith(
+      expect.stringContaining("/habito/h2"),
+    );
+  });
+
+  it("abre el primer hábito activo desde el botón superior Historial", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.endsWith("/api/habito")) {
+        return Promise.resolve({
+          status: 200,
+          json: async () => [
+            { id: "h1", nombre: "Inactivo", activo: false },
+            { id: "h2", nombre: "Leer", activo: true },
+          ],
+        });
+      }
+      if (url.includes("/api/registro_habito/estadisticas?")) {
+        return Promise.resolve({ status: 200, json: async () => [] });
+      }
+      if (url.includes("/api/registro_habito?")) {
+        return Promise.resolve({ status: 200, json: async () => [] });
+      }
+      return Promise.resolve({ status: 200, json: async () => [] });
+    });
+    const arbol = await renderizar();
+
+    pulsar(arbol, "ver-detalle-button");
+
+    expect(pushMock).toHaveBeenCalledWith(
+      expect.stringContaining("/habito/h2"),
+    );
+  });
+
+  it("inicia y detiene el podómetro desde el dashboard", async () => {
+    let estado = "sin-iniciar";
+    let pasos = 8;
+    const iniciar = jest.fn(async () => {
+      estado = "activo";
+      pasos = 24;
+    });
+    const detener = jest.fn(() => {
+      estado = "detenido";
+    });
+    (usePedometro as jest.Mock).mockImplementation(() => ({
+      estado,
+      pasos,
+      iniciar,
+      registrarManual: jest.fn(),
+      detener,
+    }));
+    configurarFetch([]);
+    const arbol = await renderizar();
+    const boton = arbol.root.findByProps({
+      testID: "iniciar-pedometro-dashboard",
+    });
+
+    expect(textosDe(arbol)).toContain("Pasos de hoy: 8");
+    await act(async () => {
+      boton.props.onPress();
+      await Promise.resolve();
+    });
+    await esperarAccion();
+    expect(iniciar).toHaveBeenCalledTimes(1);
+    expect(textosDe(arbol)).toContain("Pasos de hoy: 24");
+    expect(textosDe(arbol)).toContain("Podómetro activo");
+
+    act(() => {
+      boton.props.onPress();
+    });
+    expect(detener).toHaveBeenCalledTimes(1);
+    expect(textosDe(arbol)).toContain("Podómetro detenido");
+  });
+
+  it("avisa si el podómetro no está disponible", async () => {
+    const iniciar = jest.fn(async () => undefined);
+    (usePedometro as jest.Mock).mockReturnValue({
+      estado: "no-disponible",
+      pasos: 0,
+      iniciar,
+      registrarManual: jest.fn(),
+      detener: jest.fn(),
+    });
+    configurarFetch([]);
+    const arbol = await renderizar();
+
+    pulsar(arbol, "iniciar-pedometro-dashboard");
+
+    expect(iniciar).not.toHaveBeenCalled();
+    expect(textosDe(arbol)).toContain(
+      "Podómetro no disponible en este dispositivo",
+    );
+  });
+
   it("guarda hábitos locales y sincroniza pendientes al cargar", async () => {
     configurarFetch([]);
 

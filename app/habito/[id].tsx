@@ -18,9 +18,20 @@ import {
   gestosConBoton,
   type GestosAccesibles,
 } from "../../src/sensors/seguridad";
-import { registrarCambioOffline } from "../../src/services/offline-sync";
+import {
+  leerHabilidadesLocales,
+  leerRegistrosLocales,
+  registrarCambioOffline,
+  sincronizarCambios,
+} from "../../src/services/offline-sync";
 
-type Registro = { fecha: string; cantidad: number };
+type Registro = {
+  id?: string;
+  fecha: string;
+  cantidad: number;
+  tipo: string;
+  updated_at?: string;
+};
 type DatosEstadisticas = {
   nombre?: unknown;
   etiqueta?: unknown;
@@ -77,48 +88,149 @@ const nombreDe = (datos: DatosEstadisticas): string => {
   );
 };
 
+type RegistroNormalizado = Registro & { borrado: boolean };
+
+const ordenRegistros = (a: Registro, b: Registro): number =>
+  b.fecha.localeCompare(a.fecha) ||
+  (b.updated_at ?? "").localeCompare(a.updated_at ?? "");
+
 const registrosDe = (valor: unknown): Registro[] => {
   if (!Array.isArray(valor)) return [];
   return valor
     .map((entrada) => {
       const registro = entrada as {
+        id?: unknown;
         fecha?: unknown;
         cantidad?: unknown;
+        tipo?: unknown;
+        updated_at?: unknown;
         deleted_at?: unknown;
         deleted?: unknown;
+        borrado?: unknown;
       };
-      return {
-        fecha: texto(registro.fecha),
+      const fecha = texto(registro.fecha);
+      const id = texto(registro.id);
+      const updatedAt = texto(registro.updated_at);
+      const borrado =
+        registro.deleted_at != null ||
+        registro.deleted === true ||
+        registro.borrado === true;
+      const normalizado: RegistroNormalizado = {
+        ...(id ? { id } : {}),
+        fecha,
         cantidad: numero(registro.cantidad),
-        borrado: registro.deleted_at != null || registro.deleted === true,
+        tipo: texto(registro.tipo) || "checkin",
+        ...(updatedAt ? { updated_at: updatedAt } : {}),
+        borrado,
       };
+      return normalizado;
     })
     .filter((registro) => registro.fecha.length > 0 && !registro.borrado)
-    .sort((a, b) => b.fecha.localeCompare(a.fecha))
-    .slice(0, 5)
-    .map(({ fecha, cantidad }) => ({ fecha, cantidad }));
+    .sort(ordenRegistros)
+    .slice(0, 8)
+    .map(({ id, fecha, cantidad, tipo, updated_at }) => ({
+      ...(id ? { id } : {}),
+      fecha,
+      cantidad,
+      tipo,
+      ...(updated_at ? { updated_at } : {}),
+    }));
+};
+
+const diaAnterior = (fecha: string): string => {
+  const fechaAnterior = new Date(`${fecha}T00:00:00Z`);
+  fechaAnterior.setUTCDate(fechaAnterior.getUTCDate() - 1);
+  return fechaAnterior.toISOString().slice(0, 10);
+};
+
+const fechasUnicas = (registros: Registro[]): string[] =>
+  Array.from(new Set(registros.map((registro) => registro.fecha)))
+    .filter((fecha) => /^\d{4}-\d{2}-\d{2}$/.test(fecha))
+    .sort((a, b) => b.localeCompare(a));
+
+const mejorRachaDe = (registros: Registro[]): number => {
+  const fechas = fechasUnicas(registros).reverse();
+  let mejor = 0;
+  let actual = 0;
+  let anterior = "";
+  fechas.forEach((fecha) => {
+    actual = anterior && diaAnterior(fecha) === anterior ? actual + 1 : 1;
+    mejor = Math.max(mejor, actual);
+    anterior = fecha;
+  });
+  return mejor;
+};
+
+const rachaActualDe = (registros: Registro[], fechaHoy: string): number => {
+  const fechas = fechasUnicas(registros);
+  if (fechas.length === 0) return 0;
+  if (fechas[0] !== fechaHoy && fechas[0] !== diaAnterior(fechaHoy)) return 0;
+  let racha = 1;
+  let esperado = diaAnterior(fechas[0]);
+  for (const fecha of fechas.slice(1)) {
+    if (fecha !== esperado) break;
+    racha += 1;
+    esperado = diaAnterior(esperado);
+  }
+  return racha;
+};
+
+const claveRegistro = (registro: Registro): string =>
+  `${registro.fecha}|${registro.tipo}|${registro.id ?? registro.cantidad}`;
+
+const unirRegistros = (...listas: Registro[][]): Registro[] => {
+  const porClave = new Map<string, Registro>();
+  listas.flat().forEach((registro) => {
+    porClave.set(claveRegistro(registro), registro);
+  });
+  return Array.from(porClave.values()).sort(ordenRegistros).slice(0, 8);
 };
 
 const resumenDe = (
-  datos: DatosEstadisticas,
-  fecha: string,
   registros: Registro[],
+  fecha: string,
   meta: number,
 ): Resumen => {
-  const cantidadHoy =
-    registros.find((item) => item.fecha === fecha)?.cantidad ?? 0;
-  const porcentaje = meta > 0 ? Math.round((cantidadHoy * 100) / meta) : 0;
+  const cantidadHoy = registros
+    .filter((registro) => registro.fecha === fecha)
+    .reduce((total, registro) => total + Math.max(0, registro.cantidad), 0);
+  const metaEfectiva = meta > 0 ? meta : 1;
+  const porcentaje = Math.round((cantidadHoy * 100) / metaEfectiva);
   return {
-    racha: numero(datos.racha ?? datos.rachaActual ?? datos.racha_actual),
-    mejorRacha: numero(datos.mejorRacha ?? datos.mejor_racha),
+    racha: rachaActualDe(registros, fecha),
+    mejorRacha: mejorRachaDe(registros),
     progreso: Math.min(100, porcentaje),
-    estado:
-      porcentaje >= 100
-        ? "Completado"
-        : porcentaje > 0
-          ? "En progreso"
-          : "Pendiente",
+    estado: cantidadHoy >= metaEfectiva ? "Completado" : "Pendiente",
     registros,
+  };
+};
+
+const sumaPorTipo = (registros: Registro[], tipos: string[]): number =>
+  registros
+    .filter((registro) => tipos.includes(registro.tipo))
+    .reduce((total, registro) => total + registro.cantidad, 0);
+
+type DatosRemotos = { nombre: string; meta: number; registros: Registro[] };
+
+const cargarDatosRemotos = async (
+  fecha: string,
+  alExpirar: () => void,
+): Promise<DatosRemotos> => {
+  const token = await SecureStore.getItemAsync("token");
+  if (!token) return { nombre: "", meta: 0, registros: [] };
+  const respuesta = await peticionAutenticada(
+    `${API_BASE}/api/registro_habito/estadisticas?fecha=${fecha}`,
+    { method: "GET", headers: { Authorization: `Bearer ${token}` } },
+    alExpirar,
+  );
+  if (respuesta.status !== 200 && respuesta.status !== 201) {
+    return { nombre: "", meta: 0, registros: [] };
+  }
+  const datos = normalizarDatos(await respuesta.json());
+  return {
+    nombre: nombreDe(datos),
+    meta: numero(datos.meta),
+    registros: registrosDe(datos.registros),
   };
 };
 
@@ -159,8 +271,11 @@ function SeccionRegistros({ registros }: { registros: Registro[] }) {
       {registros.length === 0 ? (
         <Text style={styles.estado}>Sin registros recientes</Text>
       ) : (
-        registros.map((registro) => (
-          <Text key={registro.fecha} style={styles.dato}>
+        registros.map((registro, indice) => (
+          <Text
+            key={`${registro.fecha}-${registro.id ?? indice}`}
+            style={styles.dato}
+          >
             {`${registro.fecha} · ${Math.max(1, registro.cantidad)}`}
           </Text>
         ))
@@ -311,9 +426,7 @@ export default function DetalleHabitoScreen() {
   const pedometro = usePedometro();
   const acelerometro = useAcelerometro();
   const [nombre, setNombre] = useState(nombreParam || "Historial del hábito");
-  const [racha, setRacha] = useState(0);
-  const [mejorRacha, setMejorRacha] = useState(0);
-  const [meta, setMeta] = useState(numero(parametros.meta));
+  const [meta, setMeta] = useState(numero(parametros.meta) || 1);
   const [registros, setRegistros] = useState<Registro[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [entradaPasos, setEntradaPasos] = useState("");
@@ -326,31 +439,55 @@ export default function DetalleHabitoScreen() {
   const cargar = useCallback(async () => {
     setError(null);
     try {
-      const token = await SecureStore.getItemAsync("token");
-      const respuesta = await peticionAutenticada(
-        `${API_BASE}/api/registro_habito/estadisticas?fecha=${fecha}`,
-        { method: "GET", headers: { Authorization: `Bearer ${token}` } },
-        alExpirar,
+      await sincronizarCambios();
+      const [locales, habitos, remotos] = await Promise.all([
+        leerRegistrosLocales(id),
+        leerHabilidadesLocales(),
+        cargarDatosRemotos(fecha, alExpirar),
+      ]);
+      const habitoLocal = habitos.find(
+        (habito) => habito.id === id || habito._id === id,
       );
-      if (respuesta.status !== 200 && respuesta.status !== 201) {
-        setError("No se pudo cargar el historial");
-        return;
+      if (!nombreParam) {
+        setNombre(
+          remotos.nombre || habitoLocal?.nombre || "Historial del hábito",
+        );
       }
-      const datos = normalizarDatos(await respuesta.json());
-      if (!nombreParam) setNombre(nombreDe(datos) || "Historial del hábito");
-      setRacha(numero(datos.racha ?? datos.rachaActual ?? datos.racha_actual));
-      setMejorRacha(numero(datos.mejorRacha ?? datos.mejor_racha));
-      setMeta(numero(datos.meta ?? parametros.meta));
-      setRegistros(registrosDe(datos.registros));
+      setMeta(
+        remotos.meta ||
+          numero(parametros.meta) ||
+          numero(habitoLocal?.meta) ||
+          1,
+      );
+      const todos = unirRegistros(registrosDe(locales), remotos.registros);
+      setRegistros(todos);
+      setPasos(sumaPorTipo(todos, ["pasos"]));
+      setSegundosManuales(sumaPorTipo(todos, ["tiempo", "movimiento"]));
     } catch {
       setError("No se pudo cargar el historial");
     }
-  }, [alExpirar, fecha, nombreParam, parametros.meta]);
+  }, [alExpirar, fecha, id, nombreParam, parametros.meta]);
 
   useFocusEffect(
     useCallback(() => {
       void cargar();
     }, [cargar]),
+  );
+
+  const guardarRegistro = useCallback(
+    async (valor: number, tipo: string): Promise<boolean> => {
+      try {
+        await registrarCambioOffline({
+          entidad: "registro",
+          operacion: "crear",
+          datos: { habitoId: id, fecha, cantidad: valor, tipo, remote_id: id },
+        });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [fecha, id],
   );
 
   const registrarPasos = useCallback(async () => {
@@ -360,37 +497,54 @@ export default function DetalleHabitoScreen() {
       return;
     }
     const cantidad = entradaPasos.trim() ? Math.trunc(valor) : 1000;
-    try {
-      await registrarCambioOffline({
-        entidad: "registro",
-        operacion: "crear",
-        datos: { habitoId: id, fecha, cantidad, remote_id: id },
-      });
-      const total = pasos + cantidad;
-      setPasos(total);
-      pedometro.registrarManual(total);
-      setMensaje(`Pasos registrados: ${total}`);
-    } catch {
+    const guardado = await guardarRegistro(cantidad, "pasos");
+    if (!guardado) {
       setMensaje("No se pudo guardar el registro");
+      return;
     }
-  }, [entradaPasos, fecha, id, pasos, pedometro]);
+    const total = pasos + cantidad;
+    setPasos(total);
+    setRegistros((actuales) =>
+      unirRegistros(actuales, [
+        {
+          fecha,
+          cantidad,
+          tipo: "pasos",
+          updated_at: new Date().toISOString(),
+        },
+      ]),
+    );
+    pedometro.registrarManual(total);
+    setMensaje(`Pasos registrados: ${total}`);
+  }, [entradaPasos, fecha, guardarRegistro, pasos, pedometro]);
 
-  const registrarCronometro = () => {
-    const total = segundosManuales + 60;
-    setSegundosManuales(total);
-    acelerometro.registrarManual(total);
-  };
-
-  const resumen = resumenDe(
-    normalizarDatos({
-      racha,
-      mejorRacha,
-      registros,
-    }),
-    fecha,
-    registros,
-    meta,
+  const registrarTiempo = useCallback(
+    async (tipo: "tiempo" | "movimiento") => {
+      const total = segundosManuales + 60;
+      const guardado = await guardarRegistro(60, tipo);
+      if (!guardado) {
+        setMensaje("No se pudo guardar el registro");
+        return;
+      }
+      setSegundosManuales(total);
+      setRegistros((actuales) =>
+        unirRegistros(actuales, [
+          {
+            fecha,
+            cantidad: 60,
+            tipo,
+            updated_at: new Date().toISOString(),
+          },
+        ]),
+      );
+      acelerometro.registrarManual(total);
+      if (tipo === "movimiento") void acelerometro.iniciar();
+      else setMensaje(`Cronómetro manual: ${total} s`);
+    },
+    [acelerometro, fecha, guardarRegistro, segundosManuales],
   );
+
+  const resumen = resumenDe(registros, fecha, meta);
 
   return (
     <View style={styles.screen}>
@@ -408,8 +562,8 @@ export default function DetalleHabitoScreen() {
           onEntradaPasos={setEntradaPasos}
           onRegistrarPasos={() => void registrarPasos()}
           onIniciarPodometro={() => void pedometro.iniciar()}
-          onRegistrarCronometro={registrarCronometro}
-          onIniciarCronometro={() => void acelerometro.iniciar()}
+          onRegistrarCronometro={() => void registrarTiempo("tiempo")}
+          onIniciarCronometro={() => void registrarTiempo("movimiento")}
         />
       </ScrollView>
     </View>

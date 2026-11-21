@@ -18,7 +18,12 @@ import DetalleHabitoScreen, {
   fechaLocal as fechaLocalDetalle,
 } from "../app/habito/[id]";
 import GestoAccesible from "../src/components/gesto-accesible";
-import { registrarCambioOffline } from "../src/services/offline-sync";
+import {
+  leerHabilidadesLocales,
+  leerRegistrosLocales,
+  registrarCambioOffline,
+  sincronizarCambios,
+} from "../src/services/offline-sync";
 import { useAcelerometro } from "../src/sensors/use-acelerometro";
 import { usePedometro } from "../src/sensors/use-pedometro";
 
@@ -43,14 +48,44 @@ jest.mock("expo-secure-store", () => ({
   getItemAsync: jest.fn(async () => "mock-token"),
 }));
 
+type RegistroLocalMock = {
+  id: string;
+  habitoId: string;
+  fecha: string;
+  cantidad: number;
+  tipo: string;
+  updated_at: string;
+};
+
+const mockRegistrosLocales: RegistroLocalMock[] = [];
+
 jest.mock("../src/services/offline-sync", () => ({
-  registrarCambioOffline: jest.fn(async () => ({
-    id: "cambio-1",
-    entidad: "registro",
-    operacion: "crear",
-    datos: {},
-    updated_at: "2026-11-21T10:00:00.000Z",
-  })),
+  registrarCambioOffline: jest.fn(
+    async (entrada: { datos: Record<string, unknown> }) => {
+      const datos = entrada.datos;
+      const registro: RegistroLocalMock = {
+        id: `local-${mockRegistrosLocales.length + 1}`,
+        habitoId: String(datos.habitoId ?? "h1"),
+        fecha: String(datos.fecha ?? ""),
+        cantidad: Number(datos.cantidad ?? 0),
+        tipo: String(datos.tipo ?? "checkin"),
+        updated_at: new Date().toISOString(),
+      };
+      mockRegistrosLocales.push(registro);
+      return {
+        id: registro.id,
+        entidad: "registro",
+        operacion: "crear",
+        datos,
+        updated_at: registro.updated_at,
+      };
+    },
+  ),
+  leerRegistrosLocales: jest.fn(async () => mockRegistrosLocales),
+  leerHabilidadesLocales: jest.fn(async () => [
+    { id: "h1", nombre: "Leer", meta: 2 },
+  ]),
+  sincronizarCambios: jest.fn(async () => 0),
 }));
 
 jest.mock("../src/sensors/use-pedometro", () => ({
@@ -141,6 +176,12 @@ const configurarFetchDetalle = (datos: unknown): void => {
 describe("rutas, gestos y accesibilidad", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockRegistrosLocales.length = 0;
+    (leerRegistrosLocales as jest.Mock).mockResolvedValue(mockRegistrosLocales);
+    (leerHabilidadesLocales as jest.Mock).mockResolvedValue([
+      { id: "h1", nombre: "Leer", meta: 2 },
+    ]);
+    (sincronizarCambios as jest.Mock).mockResolvedValue(0);
     globalConFocus.mockFocusCallback = undefined;
     arbolActual = undefined;
     (useLocalSearchParams as jest.Mock).mockReturnValue({
@@ -234,7 +275,7 @@ describe("rutas, gestos y accesibilidad", () => {
 
     expect(textosDe(arbol)).toContain("HISTORIAL Y ESTADÍSTICAS");
     expect(textosDe(arbol)).toContain("Beber agua");
-    expect(textosDe(arbol)).toContain("Racha actual: 3");
+    expect(textosDe(arbol)).toContain("Racha actual: 1");
     expect(textosDe(arbol)).not.toContain("Hábito: h1");
     expect(
       arbol.root
@@ -267,11 +308,68 @@ describe("rutas, gestos y accesibilidad", () => {
     const arbol = await renderizarDetalle();
 
     expect(textosDe(arbol)).toContain("Beber agua");
-    expect(textosDe(arbol)).toContain("Mejor racha: 9");
+    expect(textosDe(arbol)).toContain("Mejor racha: 2");
     expect(textosDe(arbol)).toContain("Progreso: 50%");
-    expect(textosDe(arbol)).toContain("Estado: En progreso");
+    expect(textosDe(arbol)).toContain("Estado: Pendiente");
     expect(textosDe(arbol)).toContain(`${hoy} · 1`);
     expect(textosDe(arbol)).not.toContain("2026-11-19");
+  });
+
+  it("conserva estadísticas y registros al volver al detalle", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      status: 200,
+      json: async () => ({ registros: [], meta: 2 }),
+    });
+    (useLocalSearchParams as jest.Mock).mockReturnValue({ id: "h1" });
+    const arbol = await renderizarDetalle();
+
+    act(() => {
+      arbol.root
+        .findByProps({ testID: "pasos-manuales-input" })
+        .props.onChangeText("1000");
+    });
+    act(() => {
+      arbol.root.findByProps({ testID: "manual-pasos-button" }).props.onPress();
+    });
+    await esperarAccion();
+    act(() => {
+      arbol.root
+        .findByProps({ testID: "cronometro-manual-button" })
+        .props.onPress();
+    });
+    await esperarAccion();
+    expect(mockRegistrosLocales).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ tipo: "pasos", cantidad: 1000 }),
+        expect.objectContaining({ tipo: "tiempo", cantidad: 60 }),
+      ]),
+    );
+    act(() => arbol.unmount());
+
+    const arbolAlVolver = await renderizarDetalle();
+    const textos = textosDe(arbolAlVolver).map(String);
+
+    expect(sincronizarCambios).toHaveBeenCalled();
+    expect(textos).toContain("Leer");
+    expect(textos).not.toContain("h1");
+    expect(textos).toContain("Racha actual: 1");
+    expect(textos).toContain("Progreso: 100%");
+    expect(textos).toContain("Estado: Completado");
+    const registrosVisibles = textos.filter((texto) =>
+      String(texto).includes("·"),
+    );
+    expect(registrosVisibles).toContain("2026-11-21 · 1000");
+    expect(registrosVisibles).toContain("2026-11-21 · 60");
+    expect(registrarCambioOffline).toHaveBeenCalledWith(
+      expect.objectContaining({
+        datos: expect.objectContaining({ tipo: "pasos", cantidad: 1000 }),
+      }),
+    );
+    expect(registrarCambioOffline).toHaveBeenCalledWith(
+      expect.objectContaining({
+        datos: expect.objectContaining({ tipo: "tiempo", cantidad: 60 }),
+      }),
+    );
   });
 
   it("calcula fechas, registros activos y cumplimiento semanal", () => {
@@ -567,12 +665,19 @@ describe("rutas, gestos y accesibilidad", () => {
     const arbol = await renderizarDetalle();
     const boton = () =>
       arbol.root.findByProps({ testID: "cronometro-manual-button" });
-    act(() => boton().props.onPress());
-    act(() => boton().props.onPress());
-    act(() => {
+    await act(async () => {
+      boton().props.onPress();
+      await esperarAccion();
+    });
+    await act(async () => {
+      boton().props.onPress();
+      await esperarAccion();
+    });
+    await act(async () => {
       arbol.root
         .findByProps({ testID: "cronometro-acelerometro-button" })
         .props.onPress();
+      await esperarAccion();
     });
 
     expect(registrarManual).toHaveBeenNthCalledWith(1, 60);

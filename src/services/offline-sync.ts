@@ -30,6 +30,16 @@ export type HabitoLocal = {
   meta?: number;
 };
 
+export type RegistroLocal = {
+  id: string;
+  habitoId: string;
+  fecha: string;
+  cantidad: number;
+  tipo: string;
+  updated_at: string;
+  borrado: boolean;
+};
+
 const fechaActual = (): string => new Date().toISOString();
 
 const texto = (valor: unknown): string =>
@@ -37,6 +47,25 @@ const texto = (valor: unknown): string =>
 
 const numero = (valor: unknown): number =>
   typeof valor === "number" && Number.isFinite(valor) ? valor : 1;
+
+const cantidad = (valor: unknown): number =>
+  typeof valor === "number" && Number.isFinite(valor) ? valor : 0;
+
+const objeto = (valor: unknown): Record<string, unknown> => {
+  if (typeof valor === "string") {
+    try {
+      const analizado: unknown = JSON.parse(valor);
+      return typeof analizado === "object" && analizado !== null
+        ? (analizado as Record<string, unknown>)
+        : {};
+    } catch {
+      return {};
+    }
+  }
+  return typeof valor === "object" && valor !== null
+    ? (valor as Record<string, unknown>)
+    : {};
+};
 
 const generarId = (): string =>
   `offline-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -103,6 +132,49 @@ export const leerHabilidadesLocales = async (): Promise<HabitoLocal[]> => {
   return filas
     .map(habitoDe)
     .filter((habito): habito is HabitoLocal => habito !== null);
+};
+
+const registroLocalDe = (fila: unknown): RegistroLocal | null => {
+  if (typeof fila !== "object" || fila === null) return null;
+  const filaRegistro = fila as {
+    id?: unknown;
+    operacion?: unknown;
+    datos?: unknown;
+    updated_at?: unknown;
+  };
+  const id = texto(filaRegistro.id);
+  const datos = objeto(filaRegistro.datos);
+  const habitoId = texto(datos.habitoId);
+  const fecha = texto(datos.fecha);
+  if (!id || !habitoId || !fecha) return null;
+  const borrado =
+    datos.deleted === true ||
+    datos.deleted === 1 ||
+    texto(filaRegistro.operacion) === "eliminar";
+  return {
+    id,
+    habitoId,
+    fecha,
+    cantidad: cantidad(datos.cantidad),
+    tipo: texto(datos.tipo) || "checkin",
+    updated_at: texto(filaRegistro.updated_at),
+    borrado,
+  };
+};
+
+export const leerRegistrosLocales = async (
+  habitoId?: string,
+): Promise<RegistroLocal[]> => {
+  const base = await inicializarBase();
+  const filas = await base.getAllAsync(
+    "SELECT id, operacion, datos, updated_at FROM cambios_pendientes WHERE entidad = 'registro' ORDER BY updated_at",
+  );
+  return filas
+    .map(registroLocalDe)
+    .filter(
+      (registro): registro is RegistroLocal =>
+        registro !== null && (!habitoId || registro.habitoId === habitoId),
+    );
 };
 
 export const registrarCambioOffline = async (
