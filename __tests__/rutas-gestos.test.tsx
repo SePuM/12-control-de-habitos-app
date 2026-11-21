@@ -321,6 +321,21 @@ describe("rutas, gestos y accesibilidad", () => {
     ).toBeTruthy();
   });
 
+  it("explica el contador diario en la vista semanal", async () => {
+    const arbol = await renderizarSemana();
+    const nodos = arbol.root.findAll(() => true);
+    const leyenda = arbol.root.findAll(
+      (nodo) => nodo.props.children === "Contador: hábitos completados por día",
+    )[0];
+    if (!leyenda) throw new Error("No se encontró la leyenda del contador");
+
+    const resumen = arbol.root.findByProps({ testID: "semana-resumen" });
+    const dias = arbol.root.findByProps({ testID: "semana-dias" });
+    expect(nodos.indexOf(leyenda)).toBeGreaterThan(nodos.indexOf(resumen));
+    expect(nodos.indexOf(leyenda)).toBeLessThan(nodos.indexOf(dias));
+    expect(arbol.root.findByProps({ testID: "semana-gesto" })).toBeTruthy();
+  });
+
   it("ubica la pista de pulsación larga al pie de la semana", async () => {
     const arbol = await renderizarSemana();
     const nodos = arbol.root.findAll(() => true);
@@ -387,6 +402,26 @@ describe("rutas, gestos y accesibilidad", () => {
       String(texto).includes("Pasos registrados:"),
     );
     expect(pasosRegistrados).toEqual(["Pasos registrados: 1000"]);
+  });
+
+  it("aclara las herramientas de registro sin mover estadísticas ni registros", async () => {
+    const arbol = await renderizarDetalle();
+    const textos = textosDe(arbol);
+    expect(textos).toContain("Registra pasos en este hábito");
+    expect(textos).toContain("Registra tiempo o movimiento en este hábito");
+
+    const nodos = arbol.root.findAll(() => true);
+    const estadisticas = arbol.root.findByProps({
+      testID: "detalle-estadisticas",
+    });
+    const registros = arbol.root.findByProps({ testID: "detalle-registros" });
+    const sensores = arbol.root.findByProps({ testID: "detalle-sensores" });
+    expect(nodos.indexOf(estadisticas)).toBeLessThan(nodos.indexOf(registros));
+    expect(nodos.indexOf(registros)).toBeLessThan(nodos.indexOf(sensores));
+    expect(
+      arbol.root.findByProps({ testID: "cronometro-manual-button" }).props
+        .accessibilityLabel,
+    ).toBe("Cronómetro manual");
   });
 
   it("ofrece un placeholder claro en la entrada manual de pasos", async () => {

@@ -189,6 +189,9 @@ export default function SemanaScreen() {
         <Text style={styles.resumen} testID="semana-resumen">
           {`Cumplimiento semanal: ${porcentaje}%`}
         </Text>
+        <Text style={styles.leyenda} testID="semana-leyenda">
+          Contador: hábitos completados por día
+        </Text>
         {error && <Text style={styles.error}>{error}</Text>}
         <View style={styles.dias} testID="semana-dias">
           {dias.map((dia) => (
@@ -257,6 +260,7 @@ const styles = StyleSheet.create({
   },
   estado: { color: "#8E98A8", marginTop: 8 },
   resumen: { color: "#D4AF37", fontSize: 18, marginTop: 16 },
+  leyenda: { color: "#8E98A8", fontSize: 12, marginTop: 6 },
   error: { color: "#FF6B6B", marginTop: 12 },
   gestoTexto: {
     color: "#8E98A8",

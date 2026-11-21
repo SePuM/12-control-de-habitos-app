@@ -182,11 +182,29 @@ type SensoresProps = {
   onIniciarCronometro: () => void;
 };
 
-function SeccionSensores(props: SensoresProps) {
+type PasosProps = Pick<
+  SensoresProps,
+  | "pedometro"
+  | "entradaPasos"
+  | "onEntradaPasos"
+  | "onRegistrarPasos"
+  | "onIniciarPodometro"
+>;
+
+type CronometroProps = Pick<
+  SensoresProps,
+  | "acelerometro"
+  | "segundosManuales"
+  | "onRegistrarCronometro"
+  | "onIniciarCronometro"
+>;
+
+function SeccionPasos(props: PasosProps) {
   const sinPodometro = props.pedometro.estado === "no-disponible";
   return (
-    <View style={styles.seccion} testID="detalle-sensores">
-      <Text style={styles.tituloSeccion}>Sensores y registro manual</Text>
+    <>
+      <Text style={styles.tituloSeccion}>Registro de pasos</Text>
+      <Text style={styles.ayuda}>Registra pasos en este hábito</Text>
       {sinPodometro && (
         <Text style={styles.estado}>
           Podómetro no disponible; usa entrada manual
@@ -221,7 +239,17 @@ function SeccionSensores(props: SensoresProps) {
       >
         <Text style={styles.botonTexto}>Iniciar podómetro</Text>
       </TouchableOpacity>
+    </>
+  );
+}
+
+function SeccionCronometro(props: CronometroProps) {
+  return (
+    <>
       <Text style={styles.tituloSeccion}>Cronómetro</Text>
+      <Text style={styles.ayuda}>
+        Registra tiempo o movimiento en este hábito
+      </Text>
       <Text style={styles.dato}>
         {`Acelerómetro: ${props.acelerometro.estado}`}
       </Text>
@@ -247,6 +275,27 @@ function SeccionSensores(props: SensoresProps) {
       >
         <Text style={styles.botonTexto}>Iniciar cronómetro real</Text>
       </TouchableOpacity>
+    </>
+  );
+}
+
+function SeccionSensores(props: SensoresProps) {
+  return (
+    <View style={styles.seccion} testID="detalle-sensores">
+      <Text style={styles.tituloSeccion}>Sensores y registro manual</Text>
+      <SeccionPasos
+        pedometro={props.pedometro}
+        entradaPasos={props.entradaPasos}
+        onEntradaPasos={props.onEntradaPasos}
+        onRegistrarPasos={props.onRegistrarPasos}
+        onIniciarPodometro={props.onIniciarPodometro}
+      />
+      <SeccionCronometro
+        acelerometro={props.acelerometro}
+        segundosManuales={props.segundosManuales}
+        onRegistrarCronometro={props.onRegistrarCronometro}
+        onIniciarCronometro={props.onIniciarCronometro}
+      />
       {props.mensaje && <Text style={styles.mensaje}>{props.mensaje}</Text>}
     </View>
   );
@@ -399,6 +448,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginTop: 12,
   },
+  ayuda: { color: "#8E98A8", fontSize: 13, marginTop: 4 },
   dato: { color: "#F5F7FA", marginTop: 8 },
   estado: { color: "#8E98A8", marginTop: 8 },
   mensaje: { color: "#D4AF37", marginTop: 12 },
