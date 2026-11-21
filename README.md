@@ -19,7 +19,7 @@ npm install
 Crea un archivo `.env` local en la raíz del proyecto con la URL pública de la API:
 
 ```env
-EXPO_PUBLIC_API_URL=https://12-control-de-habitos-api.vercel.app
+EXPO_PUBLIC_API_URL=https://fake.vercel.app
 ```
 
 - `EXPO_PUBLIC_API_URL` es una variable pública: no contiene secretos.
